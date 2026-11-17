@@ -2,6 +2,12 @@
 
 An interactive 3D viewer for presenting blood vessel mimic test results to industry partners. Each image of vessel damage is mapped to the place on the vessel where it was taken, and the model is colored as a heat map by damage level. Partners can explore the results on a 3D model instead of paging through folders of images.
 
+**▶ Open the app: <https://aidenedwards406.github.io/3D-vessel-model/>**
+
+Click **Explore the demo study** to try it with synthetic data (15 vessels, 3 treatments, images and damage values), or load your own files. Everything runs in your browser: files are opened on your computer and never uploaded.
+
+![The 3D Vessel Model app: a tortuous vessel colored by damage, with section labels, image markers, the unrolled region map and the image panel for the selected location](docs/explore.jpg)
+
 ## Project goals
 
 1. **View a 3D vessel model in the browser**: rotate, zoom and pan.
@@ -15,6 +21,8 @@ An interactive 3D viewer for presenting blood vessel mimic test results to indus
 9. **Save and reopen studies**: save a study's full setup as one file and reopen it later without setting it up again.
 10. **Presentation mode**: a clean, distraction-free view for partner meetings.
 11. **Export for submissions**: export heat maps and charts for reports and FDA submissions.
+
+All eleven goals are implemented. See the [roadmap](#roadmap).
 
 ## Background
 
@@ -51,6 +59,8 @@ The bioreactor ID doesn't say which treatment was used, so the app also takes a 
 
 Images whose names don't match the format are flagged so they can be placed by hand.
 
+The reader is forgiving: capitals, file extensions (`.tif`, `.ome.tif`, …), spaces instead of underscores, words such as `Top`, `Prox` or `section 2`, and a missing magnification are all accepted. A suffix such as `_2` adds another image at the same spot, and `_trace` or `_mask` marks a traced damage outline that can be shown over the original. When a name can't be read, the app says exactly which part is wrong.
+
 ## How it works
 
 ### 1. Load the model
@@ -84,6 +94,43 @@ The images don't need to cover the whole vessel or overlap. They are pinned to l
 - Side-by-side view: two treatments on matching models, rotating together.
 - Summary chart: average damage per treatment group.
 
+## Using the app
+
+The left-hand panel walks through the study in numbered steps that follow the roadmap phases. Each step shows a ✓ when it's done and a ⚠ when something needs attention. You can drop files anywhere on the page: models, image folders, spreadsheets and saved studies are recognised automatically.
+
+| Step | What you do | Roadmap |
+|---|---|---|
+| **1 · Load the 3D model** | Drop an STL, GLB, glTF, OBJ (+MTL and textures), PLY, or a `.zip` from a scanning app. Set the units and which axis points up, or use **Lay flat**. | Phase 1 |
+| **2 · Define sections** | Number of sections (equal or custom lengths), medial positions, which end is proximal, which side is top, and an optional trimmed length to leave out end fittings. The centerline, cut rings and section numbers are shown on the model. | Phase 2 |
+| **3 · Add images** | Drop the whole image folder. TIFF (8/16-bit), JPEG, PNG and BMP are supported. Flagged names get a plain-language reason; place them with a form or by clicking where they were taken on the model. | Phases 3–4 |
+| **4 · Add damage data** | Drop the Excel (`.xlsx`) or CSV sheet. The image name, % damage and treatment columns are detected automatically and can be changed, with a preview. Excel percent formats are converted; values that look like fractions are flagged. Download a template pre-filled with your image names. | Phase 5 |
+| **5 · Assign treatments** | Upload a treatment key, use the column or sheet in the damage workbook, or assign treatments here. Rename groups, set their role, colour and order. | Phase 6 |
+| **6 · Explore results** | Switch vessels with ← →. Hover for values, click a marker or region (or a cell of the unrolled **region map**) to see its images; step along the vessel, flip top/bottom, and see the same location in every other vessel. Open an image full screen to zoom, pan, flip through neighbouring images and show the traced outline. Heat-map settings: palette, fixed or custom range, bands, mean/median/max per location, smooth blending. | Phases 4–5 |
+| **7 · Compare treatments** | Side by side (vessels or treatment averages, with an optional difference view), all vessels in a grid, or treatment averages. All views share one colour scale and rotate together. A summary chart shows average damage per treatment. | Phase 6 |
+| **8 · Statistics** | Summary statistics, normality and equal-spread checks, ANOVA + Tukey HSD, Welch's ANOVA + Games–Howell or Kruskal–Wallis + Dunn (chosen automatically or by hand), box plots with significance brackets, and breakdowns by section, side and position. Analyse individual images or vessel means, for all regions or one region. | Phase 10 |
+
+**Share** (bottom of the panel and top bar):
+
+- **Save** (Phase 7): one `.vessel` file with the model, sections, placements, damage data, treatment key, colours and presentation scenes, optionally with all images. Opening it restores the study exactly. Without images it stays small, and the images can be relinked from their folder.
+- **Present** (Phase 8): full screen, no editing controls, with the study title, company logo, colour legend and a confidentiality footer. Save views as **scenes** and step through them with the arrow keys; Space rotates the model. Scenes adapt to the screen they are shown on.
+- **Export** (Phase 9): high-resolution PNGs of the 3D view (up to 4K, white/transparent/dark, with title and legend), every vessel or every treatment average as a ZIP of PNGs, vector **region maps** (SVG), charts (SVG/PNG), a statistics workbook (`.xlsx`), data for JMP (`.csv`), the coloured 3D model (`.glb`, opens in PowerPoint), and a **PDF summary report** with heat maps from the top and bottom, region maps, statistics, charts, every vessel and the data table.
+
+### Statistics
+
+The statistics run in the app instead of separately in JMP, and the results can be exported to check in JMP:
+
+- Summary statistics per treatment group: mean, SD, SEM, 95% CI, median, quartiles, range and number of images (or vessels).
+- Comparisons between groups: one-way ANOVA with Tukey HSD; Welch's ANOVA with Games–Howell when spreads differ; Kruskal–Wallis with Dunn's test (Holm or Bonferroni) when the data aren't normally distributed. **Choose automatically** picks the test from Shapiro–Wilk and Brown–Forsythe checks and explains why.
+- Breakdowns by section, top/bottom and position.
+- Box plots with significance markers, exportable with the other charts.
+- Unit of analysis: individual images, or vessel means. Images from one vessel aren't independent, so vessel means give the more conservative comparison.
+
+Every test is checked against SciPy, scikit-posthocs and pingouin in the unit tests (`src/lib/stats/stats.test.ts`, reference values generated by `scripts/make_stats_fixture.py`).
+
+### How the sections are found
+
+STL files and scans don't say where the vessel's centerline is, so the app works it out. It finds the two ends of the vessel from geodesic (along-the-surface) distances, measures rings of equal distance between the two end rims, and joins the centres of those rings into a smooth centerline that follows bends. Every point on the model is then projected onto the centerline, like cutting the vessel with a blade. This works for straight, S-shaped and helical vessels, capped or open ends, and noisy scans with stray fragments. Large scans (millions of triangles) take a few seconds and are processed in the background, so the page stays responsive. For straight tubes or very irregular scans you can switch to a straight axis. "Top" is measured from the up direction, which follows the curve of the vessel.
+
 ## Confidentiality
 
 Partner data is often confidential, especially for devices still in FDA review. The app is designed so that data stays private:
@@ -93,16 +140,26 @@ Partner data is often confidential, especially for devices still in FDA review. 
 - **Data is kept out of the repository.** Only the app code is stored on GitHub. Study images, spreadsheets and partner models are loaded from your computer when you use the app, and never committed. A `.gitignore` file blocks common data file types from being uploaded by accident.
 - **Sharing with partners.** Show results in a live meeting, or give each partner only their own data. Avoid public links that contain partner data.
 
-## Suggested tools
+How this is enforced:
+
+- The page ships with a **Content-Security-Policy** that only lets it load its own files and blocks connections to any other site, so the browser itself refuses to send data elsewhere. (Tested: a deliberate request to another site is blocked, and a full session makes no requests to other origins.)
+- No analytics, fonts or scripts are loaded from other sites.
+- Study data is never written to browser storage. Only the light/dark preference is remembered. Closing the tab clears everything unless you saved a `.vessel` file.
+- The GitHub page contains only the app. Your files are never on it, and the demo study is generated synthetically in the browser.
+- For extra assurance, run the app on your own computer or private hosting (see below).
+
+## Tools used
 
 | Need | Tool | Why |
 |---|---|---|
-| 3D viewer | [Three.js](https://threejs.org) | The standard library for 3D in a web browser; free and well documented |
-| App framework | React with Vite | Simple to build and runs fully in the browser |
-| Excel reading | SheetJS (`xlsx`) | Reads `.xlsx` files directly in the browser |
+| 3D viewer | [Three.js](https://threejs.org) + [three-mesh-bvh](https://github.com/gkjohnson/three-mesh-bvh) | The standard library for 3D in a web browser; BVH makes clicking on large scans instant |
+| App framework | React with Vite, TypeScript, Tailwind CSS | Simple to build and runs fully in the browser |
+| Excel reading | A small built-in `.xlsx`/CSV reader (on [fflate](https://github.com/101arrowz/fflate)) | Reads `.xlsx` directly in the browser. Used instead of the npm SheetJS build, which has known security advisories |
+| Image decoding | Browser built-ins + [UTIF.js](https://github.com/photopea/UTIF.js) | Microscopy TIFFs, including 16-bit, with automatic contrast |
 | Phone scanning | Polycam, Scaniverse, or KIRI Engine | Free phone apps that export `.glb` / `.obj` |
-| Charts | Chart.js or Recharts | Treatment comparison charts |
-| Running it | Locally, or on private hosting | Keeps data on your machine |
+| Charts | Custom SVG charts | Treatment comparison charts that export as true vector SVG |
+| PDF reports | [jsPDF](https://github.com/parallax/jsPDF) | Builds the summary report in the browser |
+| Running it | GitHub Pages, locally, or on private hosting | No server: the app is a set of static files |
 
 ## Saving, presenting and exporting
 
@@ -110,25 +167,66 @@ Partner data is often confidential, especially for devices still in FDA review. 
 - **Presentation mode**: hides editing controls and shows a clean view with a study title, company logo and color scale legend, ready for partner meetings.
 - **Export for reports and submissions**: save high-resolution images of heat maps and charts (PNG, and SVG where possible), plus a PDF summary, for written reports and FDA submissions.
 
+<table>
+<tr>
+<td width="50%"><img src="docs/compare.jpg" alt="Compare step: treatment averages side by side on matching models, with the average damage per treatment chart"></td>
+<td width="50%"><img src="docs/statistics.jpg" alt="Statistics: the result in plain language, a box plot with significance brackets, summary statistics and assumption checks"></td>
+</tr>
+<tr>
+<td><img src="docs/sections.jpg" alt="Define sections: the vessel split along its curved centerline into four sections with cut rings, top and bottom halves and section numbers"></td>
+<td><img src="docs/present.jpg" alt="Presentation mode: full screen with study title, colour legend and confidentiality footer"></td>
+</tr>
+</table>
+
 ## More ideas
 
-- **Statistics**: run the analysis in the app instead of separately in JMP:
-  - Summary statistics per treatment group: mean, standard deviation, median, range and number of images
-  - Comparisons between groups: ANOVA with post-hoc tests (for example Tukey HSD), or non-parametric tests (Kruskal–Wallis, Dunn) when the data isn't normally distributed
-  - Breakdowns by section, top/bottom and position, to show where devices cause the most damage
-  - Box plots with significance markers, exportable with the other charts
-  - Export results as CSV so they can be checked in JMP
-- **Image viewer tools**: zoom into images, flip between neighboring images, and optionally show the traced damage outline over the original.
+- **Statistics**: run the analysis in the app instead of separately in JMP. *(Done: see [Statistics](#statistics).)*
+- **Image viewer tools**: zoom into images, flip between neighboring images, and optionally show the traced damage outline over the original. *(Done.)*
+- Possible next steps: two-way models (treatment × section), Dunnett's test against the control, navigation (tracking-force) data on the same model, and overlaying several vessels' scans.
 
 ## Roadmap
 
-- [ ] **Phase 1**: Basic viewer that loads an STL / GLB model and supports rotate and zoom
-- [ ] **Phase 2**: Split the vessel into a chosen number of sections, with top/bottom and P/M/D regions
-- [ ] **Phase 3**: Upload images, parse file names, and place markers
-- [ ] **Phase 4**: Click-to-view image panel
-- [ ] **Phase 5**: Excel upload and damage heat map
-- [ ] **Phase 6**: Treatment key and side-by-side comparison
-- [ ] **Phase 7**: Save/open project files
-- [ ] **Phase 8**: Presentation mode
-- [ ] **Phase 9**: Export images, charts and PDF summaries
-- [ ] **Phase 10**: Statistics
+- [x] **Phase 1**: Basic viewer that loads an STL / GLB model and supports rotate and zoom
+- [x] **Phase 2**: Split the vessel into a chosen number of sections, with top/bottom and P/M/D regions
+- [x] **Phase 3**: Upload images, parse file names, and place markers
+- [x] **Phase 4**: Click-to-view image panel
+- [x] **Phase 5**: Excel upload and damage heat map
+- [x] **Phase 6**: Treatment key and side-by-side comparison
+- [x] **Phase 7**: Save/open project files
+- [x] **Phase 8**: Presentation mode
+- [x] **Phase 9**: Export images, charts and PDF summaries
+- [x] **Phase 10**: Statistics
+
+## Running it yourself
+
+The app is a set of static files, so it can run anywhere without a server-side component.
+
+```bash
+npm install
+npm run dev        # development server at http://localhost:5173
+npm test           # unit tests
+npm run build      # production build in dist/
+npm run preview    # serve the production build locally
+```
+
+To use it on private hosting or a lab computer without GitHub, copy the contents of `dist/` to any web server or internal share that serves static files. Building needs Node.js 22.12 or newer (the tests need it too).
+
+### Publishing on GitHub Pages
+
+The workflow in `.github/workflows/deploy.yml` tests and builds every push and pull request, and publishes the `main` branch to GitHub Pages. To turn it on once: in the repository, open **Settings → Pages**, and under **Build and deployment** set **Source** to **GitHub Actions**. After the next push to `main` (or **Actions → Test, build and deploy → Run workflow**), the app is live at <https://aidenedwards406.github.io/3D-vessel-model/>.
+
+## Project structure
+
+```
+src/
+  App.tsx                 page layout, drag-and-drop routing, shortcuts
+  components/             UI: steps panel, 3D viewer overlays, image panel and viewer,
+                          region map, charts, statistics, dialogs, presentation mode
+  geometry/               centerline and section finding (runs in a Web Worker), STL parsing
+  three/                  Three.js engine, heat-map shader, model loaders
+  lib/                    naming convention, spreadsheets, statistics, colour scales,
+                          study data model, save/open, exports, PDF report, demo study
+  state/                  app state, derived data, actions
+scripts/make_stats_fixture.py   regenerates SciPy reference values for the statistics tests
+docs/                     screenshots (synthetic demo data)
+```

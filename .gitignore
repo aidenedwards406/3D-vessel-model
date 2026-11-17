@@ -1,0 +1,74 @@
+# ── Build output & tooling ────────────────────────────────────────────────
+node_modules/
+dist/
+coverage/
+.vite/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ── Confidential study data: never commit ────────────────────────────────
+# Partner models, images and spreadsheets are opened from your computer when
+# you use the app. These patterns stop them being committed by accident.
+# (Character classes make the patterns match any capitalisation.)
+
+# 3D models and scans
+*.[sS][tT][lL]
+*.[oO][bB][jJ]
+*.[mM][tT][lL]
+*.[gG][lL][bB]
+*.[gG][lL][tT][fF]
+*.[pP][lL][yY]
+*.3[mM][fF]
+*.[fF][bB][xX]
+*.[uU][sS][dD][zZ]
+*.[dD][aA][eE]
+*.[sS][tT][eE][pP]
+*.[sS][tT][pP]
+*.[sS][lL][dD][pP][rR][tT]
+
+# Spreadsheets and tables
+*.[xX][lL][sS]
+*.[xX][lL][sS][xX]
+*.[xX][lL][sS][mM]
+*.[xX][lL][sS][bB]
+*.[cC][sS][vV]
+*.[tT][sS][vV]
+*.[oO][dD][sS]
+*.[jJ][mM][pP]
+
+# Microscopy and image files
+*.[tT][iI][fF]
+*.[tT][iI][fF][fF]
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[pP][nN][gG]
+*.[bB][mM][pP]
+*.[gG][iI][fF]
+*.[wW][eE][bB][pP]
+*.[hH][eE][iI][cC]
+*.[cC][zZ][iI]
+*.[nN][dD]2
+*.[lL][iI][fF]
+*.[sS][vV][sS]
+*.[vV][sS][iI]
+
+# Saved studies, exports and archives
+*.vessel
+*.[pP][dD][fF]
+*.[zZ][iI][pP]
+*.7z
+*.rar
+
+# Common data folders
+/data/
+/studies/
+/partner-data/
+/exports/
+
+# The app's own assets are allowed
+!public/**
+!docs/**
