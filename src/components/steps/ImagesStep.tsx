@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Check, ChevronDown, Crosshair, EyeOff, FileWarning, Images, Link2, MapPin, Pencil, Trash2, Undo2 } from 'lucide-react';
-import { NAME_EXAMPLE, positionLabel, positionsForSection, type Side } from '../../lib/naming';
+import { NAME_EXAMPLE, positionLabel, type Side } from '../../lib/naming';
+import { medialCount } from '../../lib/regions';
 import { pickFiles } from '../../lib/files';
 import type { ImageItem } from '../../lib/study';
 import { addImageFiles, placeImage, removeAllImages, setImageExcluded } from '../../state/actions';
@@ -75,9 +76,9 @@ export function PlacementEditor({ image, onDone }: { image: ImageItem; onDone?: 
   const [vessel, setVessel] = useState(guessVessel);
   const [section, setSection] = useState(image.manual?.section ?? image.parsed?.section ?? 1);
   const [side, setSide] = useState<Side>(image.manual?.side ?? image.parsed?.side ?? 'T');
-  const medial = layout.medial[Math.max(0, Math.min(layout.count - 1, section - 1))] ?? 1;
-  const positions = positionsForSection(Math.max(medial, 3));
-  const [position, setPosition] = useState(image.manual?.position ?? image.parsed?.position ?? 'P');
+  const positions = layout.positions[Math.max(0, Math.min(layout.count - 1, section - 1))] ?? ['P'];
+  const [positionRaw, setPosition] = useState(image.manual?.position ?? image.parsed?.position ?? 'P');
+  const position = positions.includes(positionRaw) ? positionRaw : positions[0];
   const valid = vessel.trim().length > 0;
   return (
     <div className="mt-2 space-y-2 rounded-md border border-line bg-surface p-2.5">
@@ -113,7 +114,7 @@ export function PlacementEditor({ image, onDone }: { image: ImageItem; onDone?: 
           <select className="field mt-0.5" value={position} onChange={(e) => setPosition(e.target.value)}>
             {positions.map((p) => (
               <option key={p} value={p}>
-                {p} · {positionLabel(p, positions.length - 2)}
+                {p} · {positionLabel(p, medialCount(positions))}
               </option>
             ))}
           </select>

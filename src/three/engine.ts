@@ -456,9 +456,9 @@ export class VesselEngine {
     const bounds = new Array(MAX_SECTIONS + 1).fill(1);
     layout.boundaries.forEach((b, i) => (bounds[i] = b));
     u.uBounds.value = bounds;
-    const med = new Array(MAX_SECTIONS).fill(1);
-    layout.medial.forEach((m, i) => (med[i] = m));
-    u.uMedial.value = med;
+    const slots = new Array(MAX_SECTIONS).fill(1);
+    layout.positions.forEach((p, i) => (slots[i] = Math.max(1, p.length)));
+    u.uSlots.value = slots;
     u.uFlip.value = layout.flip ? 1 : 0;
     u.uTop.value.set(Math.cos(layout.topOffset), Math.sin(layout.topOffset));
     u.uTrim.value.set(layout.trimStart, layout.trimEnd);

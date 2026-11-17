@@ -2,7 +2,7 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useDark } from './useTheme';
 import { ChevronDown, Map as MapIcon } from 'lucide-react';
 import { colorForValue, formatPercent, inkOn } from '../lib/colormaps';
-import { positionShort, positionsForSection, sideLabel, type Side } from '../lib/naming';
+import { positionShort, sideLabel, type Side } from '../lib/naming';
 import { regionIndex, type Layout } from '../lib/regions';
 import type { RegionValues } from '../lib/study';
 import { selectLocation } from '../state/actions';
@@ -50,13 +50,13 @@ export function RegionMap({ values, scale, layout, width, colors, selected, onSe
   const top = title ? 40 : 22;
   const rowH = 34;
   const gap = 8;
-  const totalSlots = layout.medial.reduce((s, m) => s + m + 2, 0);
+  const totalSlots = layout.positions.reduce((n, p) => n + p.length, 0);
   const cellW = Math.max(8, (width - left - right - gap * (layout.count - 1)) / totalSlots);
   const height = top + rowH * 2 + 2 + 36;
   let x = left;
   const sectionsX: { s: number; x: number; w: number; positions: string[] }[] = [];
   for (let s = 1; s <= layout.count; s++) {
-    const positions = positionsForSection(layout.medial[s - 1]);
+    const positions = layout.positions[s - 1];
     const w = positions.length * cellW;
     sectionsX.push({ s, x, w, positions });
     x += w + gap;
@@ -127,7 +127,7 @@ export function RegionMap({ values, scale, layout, width, colors, selected, onSe
           )}
           {positions.map((pos, slot) => (
             <text key={pos} x={sx + slot * cellW + cellW / 2} y={top + 2 * rowH + 2 + 15} fontSize={10.5} textAnchor="middle" fill={colors.muted}>
-              {positionShort(pos, positions.length - 2)}
+              {positionShort(pos, positions.filter((p) => p.startsWith('M')).length)}
             </text>
           ))}
         </g>

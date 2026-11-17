@@ -1,4 +1,4 @@
-import { getDerived, getVessels } from '../../state/derived';
+import { getDerived, getLayout, getPositionMismatches, getVessels } from '../../state/derived';
 import type { AppState, StepId } from '../../state/store';
 
 export type StepStatus = 'done' | 'attention' | 'todo' | 'optional' | 'locked';
@@ -43,8 +43,12 @@ export function stepMeta(s: AppState): StepMeta[] {
       title: 'Define sections',
       phase: 'Phase 2',
       group: 'setup',
-      status: !modelReady ? 'locked' : s.dirty || hasData ? 'done' : 'todo',
-      summary: `${s.sections.count} sections · top/bottom · P, M, D`,
+      status: !modelReady ? 'locked' : getPositionMismatches(s).length ? 'attention' : s.dirty || hasData ? 'done' : 'todo',
+      summary: (() => {
+        const l = getLayout(s);
+        const lists = new Set(l.positions.map((p) => p.map((x) => (x === 'M1' && p.filter((y) => y.startsWith('M')).length === 1 ? 'M' : x)).join(', ')));
+        return `${l.count} sections · top/bottom · ${lists.size === 1 ? [...lists][0] : 'positions vary by section'}`;
+      })(),
     },
     {
       id: 'images',

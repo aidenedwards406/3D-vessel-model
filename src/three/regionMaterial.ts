@@ -23,7 +23,8 @@ export interface RegionUniforms {
   uSectionColors: THREE.IUniform<THREE.DataTexture>;
   uCount: THREE.IUniform<number>;
   uBounds: THREE.IUniform<number[]>;
-  uMedial: THREE.IUniform<number[]>;
+  /** Number of positions (slots) in each section. */
+  uSlots: THREE.IUniform<number[]>;
   uFlip: THREE.IUniform<number>;
   uTop: THREE.IUniform<THREE.Vector2>;
   uTrim: THREE.IUniform<THREE.Vector2>;
@@ -65,7 +66,7 @@ export function createRegionUniforms(): RegionUniforms {
     uSectionColors: { value: makeLutTexture(new Uint8Array(MAX_SECTIONS * 4).fill(200), true) },
     uCount: { value: 4 },
     uBounds: { value: new Array(MAX_SECTIONS + 1).fill(1) },
-    uMedial: { value: new Array(MAX_SECTIONS).fill(1) },
+    uSlots: { value: new Array(MAX_SECTIONS).fill(3) },
     uFlip: { value: 0 },
     uTop: { value: new THREE.Vector2(1, 0) },
     uTrim: { value: new THREE.Vector2(0, 1) },
@@ -97,7 +98,7 @@ uniform sampler2D uColormap;
 uniform sampler2D uSectionColors;
 uniform int uCount;
 uniform float uBounds[${MAX_SECTIONS + 1}];
-uniform float uMedial[${MAX_SECTIONS}];
+uniform float uSlots[${MAX_SECTIONS}];
 uniform float uFlip;
 uniform vec2 uTop;
 uniform vec2 uTrim;
@@ -121,10 +122,10 @@ vec4 cellAt(int s, float side, float slot) {
 
 // Value of a neighbouring slot, crossing into the adjacent section when needed.
 vec4 neighbour(int s, float side, float slot) {
-  float slots = uMedial[s] + 2.0;
+  float slots = uSlots[s];
   if (slot < 0.0) {
     if (s == 0) return vec4(0.0);
-    return cellAt(s - 1, side, uMedial[s - 1] + 1.0);
+    return cellAt(s - 1, side, uSlots[s - 1] - 1.0);
   }
   if (slot >= slots) {
     if (s + 1 >= uCount) return vec4(0.0);
@@ -150,7 +151,7 @@ vec3 regionColor() {
   float b0 = uBounds[s];
   float b1 = uBounds[s + 1];
   float w = clamp((u - b0) / max(1e-6, b1 - b0), 0.0, 0.99999);
-  float slots = uMedial[s] + 2.0;
+  float slots = max(1.0, uSlots[s]);
   float slotF = w * slots;
   float slot = min(slots - 1.0, floor(slotF));
   float sinA = uFlip > 0.5 ? -vAng.y : vAng.y;

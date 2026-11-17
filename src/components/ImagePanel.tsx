@@ -4,7 +4,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { ChevronDown, ChevronLeft, ChevronRight, ImageOff, Layers, X } from 'lucide-react';
 import { colorForValue, formatPercent, inkOn, seriesColor } from '../lib/colormaps';
 import { thumbUrl } from '../lib/images';
-import { positionLabel, positionsForSection, sideLabel, type Side } from '../lib/naming';
+import { positionLabel, sideLabel, type Side } from '../lib/naming';
+import { medialCount } from '../lib/regions';
 import { regionFor } from '../lib/regions';
 import { locKey, type LocationData, type Observation } from '../lib/study';
 import { clearSelection, selectLocation } from '../state/actions';
@@ -199,11 +200,11 @@ export function ImagePanel() {
     panelRef.current?.focus({ preventScroll: true });
   }, [sel?.vKey, sel?.groupId]);
   if (!sel) return null;
-  const medial = layout.medial[sel.section - 1] ?? 1;
-  const positions = positionsForSection(medial);
+  const positions = layout.positions[sel.section - 1] ?? [];
+  const medial = medialCount(positions);
   // Sequence of locations along the vessel on this side.
   const seq: { section: number; position: string }[] = [];
-  for (let sec = 1; sec <= layout.count; sec++) for (const p of positionsForSection(layout.medial[sec - 1])) seq.push({ section: sec, position: p });
+  for (let sec = 1; sec <= layout.count; sec++) for (const p of layout.positions[sec - 1]) seq.push({ section: sec, position: p });
   const at = seq.findIndex((x) => x.section === sel.section && x.position === sel.position);
   const go = (i: number) => {
     const t = seq[i];

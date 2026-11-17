@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { allPositions } from '../../lib/regions';
 import { useShallow } from 'zustand/react/shallow';
 import { ArrowLeftRight, MousePointerClick } from 'lucide-react';
 import { formatPercent, PALETTES, type PaletteId } from '../../lib/colormaps';
@@ -6,7 +7,6 @@ import { sectionSummaries, type ViewTarget } from '../../lib/study';
 import { getScale, currentVessel, parseTarget, targetToString, useLayout, useVessels } from '../../state/derived';
 import { set, useStore, type HeatSettings, type StatsSettings } from '../../state/store';
 import { defaultPair } from '../../state/views';
-import { positionsForSection } from '../../lib/naming';
 import { Button, Callout, Field, Segmented, Stat, Switch, cx } from '../ui';
 import { Help, NextButton } from './common';
 
@@ -288,7 +288,7 @@ export function StatsStep() {
   const st = useStore((s) => s.stats);
   const layout = useLayout();
   const setStats = (patch: Partial<StatsSettings>) => set((s) => ({ stats: { ...s.stats, ...patch }, dirty: true }));
-  const positions = positionsForSection(Math.max(...layout.medial));
+  const positions = allPositions(layout);
   return (
     <div className="space-y-4">
       <Help>

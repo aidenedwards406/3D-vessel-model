@@ -1,11 +1,193 @@
-import { ArrowLeftRight, RotateCcw } from 'lucide-react';
-import { positionsForSection } from '../../lib/naming';
-import { equalBoundaries } from '../../lib/regions';
+import { ArrowLeftRight, Minus, Plus, RotateCcw, Undo2 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
+import { equalBoundaries, positionList, sectionPositionsFor, type SectionPositions } from '../../lib/regions';
 import { setCenterlineMode } from '../../state/actions';
-import { useDerived, useLayout } from '../../state/derived';
+import { getPositionMismatches, useDerived, useLayout } from '../../state/derived';
 import { set, update, useStore } from '../../state/store';
-import { Button, Callout, Field, Segmented, Slider, Switch } from '../ui';
+import { Button, Callout, Field, IconButton, Segmented, Slider, Switch, cx } from '../ui';
 import { Help, NextButton, Stepper } from './common';
+
+const PRESETS: { label: string; sp: SectionPositions | null }[] = [
+  { label: 'Match file names', sp: null },
+  { label: 'P · M · D', sp: { p: true, medial: 1, d: true } },
+  { label: 'P · M1 · M2 · D', sp: { p: true, medial: 2, d: true } },
+  { label: 'P · D', sp: { p: true, medial: 0, d: true } },
+];
+
+function setSectionPositions(index: number | 'all', sp: SectionPositions | null) {
+  update((s) => {
+    const arr = [...(s.sections.sectionPositions ?? [])];
+    while (arr.length < s.sections.count) arr.push(null);
+    if (index === 'all') for (let i = 0; i < s.sections.count; i++) arr[i] = sp ? { ...sp } : null;
+    else arr[index] = sp;
+    return { sections: { ...s.sections, sectionPositions: arr } };
+  });
+}
+
+function ToggleChip({ on, label, title, disabled, onClick }: { on: boolean; label: string; title: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={cx(
+        'h-7 w-8 rounded-md border font-mono text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+        on ? 'border-accent bg-accent text-accent-ink' : 'border-line bg-surface-2 text-muted line-through hover:text-ink',
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** Per-section choice of positions: P on/off, number of medial positions, D on/off. */
+function SectionPositionsEditor() {
+  const sections = useStore((s) => s.sections);
+  const d = useDerived();
+  const mismatches = useStore(useShallow(getPositionMismatches));
+  const count = Math.max(1, Math.min(24, Math.round(sections.count)));
+  const rows = Array.from({ length: count }, (_v, i) => sectionPositionsFor(sections, i, d.medialBySection));
+  const anyCustom = rows.some((r) => r.custom);
+
+  const fixMismatches = () => {
+    const needed = new Map<number, string[]>();
+    for (const m of mismatches) needed.set(m.section, [...(needed.get(m.section) ?? []), m.position]);
+    for (const [section, positions] of needed) {
+      const { sp } = sectionPositionsFor(useStore.getState().sections, section - 1, d.medialBySection);
+      const next = { ...sp };
+      for (const p of positions) {
+        if (p === 'P') next.p = true;
+        else if (p === 'D') next.d = true;
+        else next.medial = Math.max(next.medial, parseInt(p.slice(1), 10) || 1);
+      }
+      setSectionPositions(section - 1, next);
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="label mb-0">Positions in each section</span>
+        <select
+          className="field h-7 w-auto text-[12px]"
+          aria-label="Set every section"
+          value=""
+          onChange={(e) => {
+            const preset = PRESETS[Number(e.target.value)];
+            if (preset) setSectionPositions('all', preset.sp);
+          }}
+        >
+          <option value="" disabled>
+            Set all sections…
+          </option>
+          {PRESETS.map((p, i) => (
+            <option key={p.label} value={i}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="mb-2 text-[11.5px] leading-snug text-muted">
+        Turn proximal (P) and distal (D) on or off and choose how many medial positions (M) each section was imaged at. Sections marked “auto” follow your
+        file names.
+      </p>
+      <ul className="space-y-1.5">
+        {rows.map(({ sp, custom }, i) => {
+          const list = positionList(sp);
+          const only = list.length === 1;
+          return (
+            <li key={i} className="rounded-lg border border-line bg-surface-2 px-2 py-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="tabular w-[62px] shrink-0 text-[12.5px] font-semibold text-ink">Section {i + 1}</span>
+                <ToggleChip
+                  on={sp.p}
+                  label="P"
+                  title={sp.p ? 'Proximal position included. Click to remove.' : 'No proximal position. Click to add.'}
+                  disabled={sp.p && only}
+                  onClick={() => setSectionPositions(i, { ...sp, p: !sp.p })}
+                />
+                <div className="flex h-7 items-center rounded-md border border-line bg-surface">
+                  <button
+                    type="button"
+                    aria-label={`Fewer medial positions in section ${i + 1}`}
+                    disabled={sp.medial === 0 || (only && sp.medial === 1)}
+                    onClick={() => setSectionPositions(i, { ...sp, medial: sp.medial - 1 })}
+                    className="flex h-full w-6 items-center justify-center text-ink-2 hover:bg-sunken disabled:opacity-35"
+                  >
+                    <Minus className="h-3 w-3" />
+                  </button>
+                  <span className="tabular min-w-[44px] text-center font-mono text-[12px] font-semibold text-ink" title="Medial positions">
+                    {sp.medial === 0 ? 'no M' : sp.medial === 1 ? 'M' : `M×${sp.medial}`}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`More medial positions in section ${i + 1}`}
+                    disabled={sp.medial >= 12}
+                    onClick={() => setSectionPositions(i, { ...sp, medial: sp.medial + 1 })}
+                    className="flex h-full w-6 items-center justify-center text-ink-2 hover:bg-sunken disabled:opacity-35"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </div>
+                <ToggleChip
+                  on={sp.d}
+                  label="D"
+                  title={sp.d ? 'Distal position included. Click to remove.' : 'No distal position. Click to add.'}
+                  disabled={sp.d && only}
+                  onClick={() => setSectionPositions(i, { ...sp, d: !sp.d })}
+                />
+                <span className="ml-auto flex items-center">
+                  {custom ? (
+                    <IconButton label="Back to auto (match file names)" size="sm" side="left" onClick={() => setSectionPositions(i, null)}>
+                      <Undo2 className="h-3.5 w-3.5" />
+                    </IconButton>
+                  ) : (
+                    <span className="rounded bg-sunken px-1.5 py-0.5 text-[10.5px] font-medium text-muted">auto</span>
+                  )}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1 pl-[68px]">
+                {list.map((p) => (
+                  <span key={p} className="rounded bg-accent-soft px-1.5 py-px font-mono text-[10.5px] font-medium text-accent-soft-ink">
+                    {sp.medial === 1 && p === 'M1' ? 'M' : p}
+                  </span>
+                ))}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      {anyCustom && (
+        <button type="button" className="mt-1.5 text-[12px] font-medium text-accent hover:underline" onClick={() => setSectionPositions('all', null)}>
+          Set every section back to auto
+        </button>
+      )}
+      {mismatches.length > 0 && (
+        <Callout
+          kind="warning"
+          className="mt-2"
+          title="Some images use a position their section doesn't have"
+          action={
+            <Button size="sm" onClick={fixMismatches}>
+              Add these positions
+            </Button>
+          }
+        >
+          <ul className="mt-0.5">
+            {mismatches.map((m) => (
+              <li key={`${m.section}${m.position}`}>
+                Section {m.section}, {m.position}: {m.count} image{m.count === 1 ? '' : 's'} or value{m.count === 1 ? '' : 's'}
+              </li>
+            ))}
+          </ul>
+          <span className="mt-1 block">They aren't shown on the model or included in statistics until the position is added.</span>
+        </Callout>
+      )}
+    </div>
+  );
+}
 
 export function SectionsStep() {
   const sections = useStore((s) => s.sections);
@@ -16,7 +198,6 @@ export function SectionsStep() {
   const setSec = (patch: Partial<typeof sections>) => update((s) => ({ sections: { ...s.sections, ...patch } }));
   const custom = sections.boundaries !== null;
   const bounds = layout.boundaries;
-  const medialSummary = [...new Set(layout.medial)].length === 1 ? positionsForSection(layout.medial[0]).join(', ') : 'varies by section';
 
   return (
     <div className="space-y-4">
@@ -82,15 +263,7 @@ export function SectionsStep() {
         </div>
       )}
 
-      <Field
-        label="Positions within each section"
-        hint={`Currently ${medialSummary}. Extra medial positions (M2, M3…) are added automatically when your file names use them.`}
-      >
-        <div className="flex items-center gap-2">
-          <Stepper label="medial positions" value={sections.minMedial} min={1} max={12} onChange={(minMedial) => setSec({ minMedial })} />
-          <span className="text-[12px] text-ink-2">medial position{sections.minMedial === 1 ? '' : 's'} (M)</span>
-        </div>
-      </Field>
+      <SectionPositionsEditor />
 
       <Field label="Proximal end" hint="Section 1 starts at the proximal end, shown with a label on the model.">
         <Button size="sm" icon={<ArrowLeftRight className="h-3.5 w-3.5" />} onClick={() => setSec({ flip: !sections.flip })}>
@@ -162,7 +335,7 @@ export function SectionsStep() {
         size="sm"
         variant="ghost"
         icon={<RotateCcw className="h-3.5 w-3.5" />}
-        onClick={() => setSec({ boundaries: null, flip: false, topOffsetDeg: 0, trimStart: 0, trimEnd: 1, minMedial: 1 })}
+        onClick={() => setSec({ boundaries: null, flip: false, topOffsetDeg: 0, trimStart: 0, trimEnd: 1, minMedial: 1, sectionPositions: [] })}
       >
         Reset section settings
       </Button>

@@ -10,6 +10,7 @@ import { useStore } from '../state/store';
 import { BoxPlotChart, BreakdownChart, GroupDotChart, errorLabel } from '../components/charts';
 import { RegionMap, chromeColors } from '../components/RegionMap';
 import type { ViewTarget } from './study';
+import { positionsSummary } from './regions';
 
 export interface ReportOptions {
   pageSize: 'letter' | 'a4';
@@ -178,7 +179,7 @@ export async function buildReport(opts: ReportOptions): Promise<Blob> {
         s.images.filter((i) => !i.excluded && !(i.parsed?.overlay && !i.manual)).length,
         s.damage.rows.length,
         layout.count,
-        Math.max(...layout.medial) > 1 ? `P, M1-M${Math.max(...layout.medial)}, D` : 'P, M, D',
+        new Set(layout.positions.map((p) => p.join(','))).size === 1 ? layout.positions[0].join(', ') : 'Varies (see Methods)',
       ],
     ],
   );
@@ -188,7 +189,7 @@ export async function buildReport(opts: ReportOptions): Promise<Blob> {
   y = M;
   h1('Methods');
   para(
-    `Model: ${s.model.name || 'not loaded'} (${s.model.format.toUpperCase()}, ${s.model.triangleCount.toLocaleString()} triangles). The vessel was divided along its ${s.model.method === 'curved' ? 'curved centerline (following bends)' : 'main axis'} into ${layout.count} sections numbered from proximal to distal${layout.trimStart > 0 || layout.trimEnd < 1 ? `, covering ${(layout.trimStart * 100).toFixed(1)}-${(layout.trimEnd * 100).toFixed(1)}% of its length` : ''}. Each section was divided into top and bottom halves and into proximal (P), medial (M1, M2, ...) and distal (D) positions along its length.`,
+    `Model: ${s.model.name || 'not loaded'} (${s.model.format.toUpperCase()}, ${s.model.triangleCount.toLocaleString()} triangles). The vessel was divided along its ${s.model.method === 'curved' ? 'curved centerline (following bends)' : 'main axis'} into ${layout.count} sections numbered from proximal to distal${layout.trimStart > 0 || layout.trimEnd < 1 ? `, covering ${(layout.trimStart * 100).toFixed(1)}-${(layout.trimEnd * 100).toFixed(1)}% of its length` : ''}. Each section was divided into top and bottom halves and into proximal (P), medial (M1, M2, ...) and distal (D) positions along its length (${positionsSummary(layout)}).`,
   );
   para(
     'Images were placed automatically from their file names (BIOREACTOR_MAGNIFICATION_SECTION_SIDE_POSITION, e.g. BRS24-10_4x_2_T_M2). Damage was quantified by tracing damaged areas in each image and counting damaged pixels, recorded as percent damage per image.',

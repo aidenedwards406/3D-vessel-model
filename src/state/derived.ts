@@ -126,3 +126,25 @@ export function currentVessel(s: AppState): VesselData | null {
   if (vessels.length === 0) return null;
   return vessels.find((v) => v.vKey === s.vessel) ?? vessels[0];
 }
+
+/** Images/values whose position isn't one of their section's positions (so they can't be shown). */
+export interface PositionMismatch {
+  section: number;
+  position: string;
+  count: number;
+}
+
+const mismatchMemo = memo((d: Derived, l: Layout): PositionMismatch[] => {
+  const byKey = new Map<string, PositionMismatch>();
+  for (const o of d.observations) {
+    if (o.section > l.count) continue;
+    if (l.positions[o.section - 1].includes(o.position)) continue;
+    const k = `${o.section}|${o.position}`;
+    const m = byKey.get(k) ?? { section: o.section, position: o.position, count: 0 };
+    m.count++;
+    byKey.set(k, m);
+  }
+  return [...byKey.values()].sort((a, b) => a.section - b.section || a.position.localeCompare(b.position));
+});
+
+export const getPositionMismatches = (s: AppState): PositionMismatch[] => mismatchMemo(getDerived(s), getLayout(s));

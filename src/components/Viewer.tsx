@@ -18,10 +18,10 @@ import {
 } from 'lucide-react';
 import { buildColormapLUT, formatPercent, paletteStops, sectionColor, seriesColor } from '../lib/colormaps';
 import { positionLabel, sideLabel } from '../lib/naming';
-import { regionFor } from '../lib/regions';
+import { medialCount, regionFor } from '../lib/regions';
 import { addScene, clearSelection, placeImage, selectLocation, stepVessel } from '../state/actions';
 import { assets } from '../state/assets';
-import { currentVessel, getDerived, targetValues, useLayout, useVessels } from '../state/derived';
+import { currentVessel, getDerived, getLayout, targetValues, useLayout, useVessels } from '../state/derived';
 import { set, toast, useStore } from '../state/store';
 import { computeViews, type ViewSet } from '../state/views';
 import { VesselEngine, type CameraPreset, type PickInfo, type ViewMode } from '../three/engine';
@@ -532,7 +532,7 @@ function HoverTooltip({ hover, viewSet, width }: { hover: HoverState; viewSet: V
     regionInfo = region ?? { section: Number(sec), side: side as 'T' | 'B', position: pos, slot: 0, index: -1 };
   }
   if (!regionInfo) return null;
-  const medial = Math.max(1, Math.max(...(getDerived(s).medialBySection.length ? getDerived(s).medialBySection : [1])));
+  const medial = medialCount(getLayout(s).positions[regionInfo.section - 1] ?? []);
   let valueText = '';
   let detail = '';
   let hasData = false;
