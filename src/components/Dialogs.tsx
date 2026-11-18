@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  BookOpen,
   Box,
   FileImage,
   FileSpreadsheet,
@@ -429,6 +430,15 @@ function PresentationSettingsDialog() {
                     aria-label="Scene title"
                     onChange={(e) => setP({ scenes: p.scenes.map((x) => (x.id === sc.id ? { ...x, title: e.target.value } : x)) })}
                   />
+                  {sc.opening && sc.opening.amount > 0 && (
+                    <span
+                      className="tabular flex shrink-0 items-center gap-1 rounded bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-accent-soft-ink"
+                      title="The vessel opens to this angle in this scene"
+                    >
+                      <BookOpen className="h-3 w-3" aria-hidden />
+                      {Math.round(sc.opening.amount * 180)}°
+                    </span>
+                  )}
                   <Button size="xs" variant="ghost" onClick={() => applyScene(sc)}>
                     Show
                   </Button>
@@ -459,6 +469,7 @@ function HelpDialog() {
     [['Click'], 'Open the images at a location'],
     [['Drag'], 'Rotate · right-drag or Shift-drag to pan · scroll to zoom'],
     [['R'], 'Reset the view'],
+    [['O'], 'Open or close the vessel like a book (or drag the slider on the right of the 3D view)'],
     [['Esc'], 'Close the image panel or cancel placing'],
     [['Ctrl', 'S'], 'Save the study'],
     [['Ctrl', 'O'], 'Open a study'],

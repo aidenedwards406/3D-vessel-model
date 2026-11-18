@@ -27,6 +27,7 @@ import { computeViews, type ViewSet } from '../state/views';
 import { VesselEngine, type CameraPreset, type PickInfo, type ViewMode } from '../three/engine';
 import { orientationQuaternion } from '../state/actions';
 import { DiffLegend, HeatLegend, SectionLegend } from './Legend';
+import { OpenSlider } from './OpenSlider';
 import { Button, cx, IconButton, Progress, Segmented } from './ui';
 
 function useElementSize(ref: React.RefObject<HTMLElement | null>) {
@@ -69,6 +70,16 @@ export function Viewer({ dark }: { dark: boolean }) {
   const [anchors, setAnchors] = useState<{ id: string; text: string; kind: 'section' | 'end' }[]>([]);
   const [hover, setHover] = useState<HoverState | null>(null);
   const size = useElementSize(containerRef);
+  // Height of the toolbar row(s) at the top, which wrap on narrow screens; the open/close slider sits below.
+  const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
+  const [toolbarH, setToolbarH] = useState(38);
+  useLayoutEffect(() => {
+    if (!toolbarEl) return;
+    const ro = new ResizeObserver(() => setToolbarH(toolbarEl.offsetHeight));
+    ro.observe(toolbarEl);
+    setToolbarH(toolbarEl.offsetHeight);
+    return () => ro.disconnect();
+  }, [toolbarEl]);
 
   const model = useStore((s) => s.model);
   const layout = useLayout();
@@ -76,6 +87,7 @@ export function Viewer({ dark }: { dark: boolean }) {
   const heat = useStore((s) => s.heat);
   const step = useStore((s) => s.step);
   const selection = useStore((s) => s.selection);
+  const hasSelection = selection !== null;
   const placing = useStore((s) => s.placing);
   const presenting = useStore((s) => s.presenting);
   const highlightSection = useStore((s) => s.highlightSection);
@@ -113,7 +125,7 @@ export function Viewer({ dark }: { dark: boolean }) {
       for (const a of anchorsRef.current) {
         const el = labelRefs.current.get(a.id);
         if (!el) continue;
-        const p = eng.project(a.pos, 0);
+        const p = eng.project(eng.anchorPosition(a), 0);
         el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`;
         el.style.visibility = p.behind ? 'hidden' : 'visible';
       }
@@ -177,6 +189,9 @@ export function Viewer({ dark }: { dark: boolean }) {
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;
+    // Show a new or reopened model as open or closed as the slider says.
+    const opening = useStore.getState().opening;
+    eng.setOpening(opening.amount, opening.side);
     if (assets.model.result) {
       eng.setOrientation(orientationQuaternion(model.upAxis, model.rotation));
       eng.setLayout(layoutRef.current);
@@ -333,7 +348,7 @@ export function Viewer({ dark }: { dark: boolean }) {
         })}
 
       {model.status === 'ready' && !presenting && (
-        <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-wrap items-start justify-between gap-2">
+        <div ref={setToolbarEl} className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-wrap items-start justify-between gap-2">
           <div className="pointer-events-auto min-w-0">
             <TopLeftControls compare={viewSet.compare} />
           </div>
@@ -355,6 +370,27 @@ export function Viewer({ dark }: { dark: boolean }) {
           {effectiveMode === 'heat' && <HeatLegend scale={viewSet.scale} />}
           {effectiveMode === 'heat' && legendView && <DiffLegend max={legendView.diffMax} />}
           {effectiveMode === 'sections' && !viewSet.compare && <SectionLegend count={layout.count} />}
+        </div>
+      )}
+
+      {/* Open / close the vessel lengthways. Sits on the right edge, left of the image panel when that covers the view,
+          below the toolbar (or the presentation title) and above a legend in the bottom-right corner. */}
+      {model.status === 'ready' && step !== 'stats' && (
+        <div
+          style={{
+            top: presenting ? 96 : Math.max(60, toolbarH + 22),
+            bottom: viewSet.compare && viewSet.views.length > 4 ? (presenting ? 150 : 100) : presenting ? 64 : 24,
+          }}
+          className={cx(
+            'pointer-events-none absolute z-[5] flex items-center',
+            !hasSelection
+              ? 'right-3'
+              : presenting
+                ? 'right-[392px] max-lg:right-[calc(min(400px,94vw)+12px)]'
+                : 'right-3 max-lg:right-[calc(min(400px,94vw)+12px)]',
+          )}
+        >
+          <OpenSlider disabledReason={effectiveMode === 'original' ? 'Switch to Plain, Sections or Heat map to open the vessel' : null} />
         </div>
       )}
 
@@ -528,8 +564,9 @@ function HoverTooltip({ hover, viewSet, width }: { hover: HoverState; viewSet: V
   const region = hover.info.region;
   let regionInfo = region;
   if (hover.info.markerKey) {
+    // On a marker, describe the marker's location: that's what a click opens.
     const [, sec, side, pos] = hover.info.markerKey.split('|');
-    regionInfo = region ?? { section: Number(sec), side: side as 'T' | 'B', position: pos, slot: 0, index: -1 };
+    regionInfo = regionFor(Number(sec), side as 'T' | 'B', pos, getLayout(s)) ?? region ?? { section: Number(sec), side: side as 'T' | 'B', position: pos, slot: 0, index: -1 };
   }
   if (!regionInfo) return null;
   const medial = medialCount(getLayout(s).positions[regionInfo.section - 1] ?? []);

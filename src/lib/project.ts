@@ -37,6 +37,7 @@ interface ProjectJson {
     | 'presentation'
     | 'compare'
     | 'viewMode'
+    | 'opening'
     | 'vessel'
     | 'step'
     | 'treatments'
@@ -144,6 +145,7 @@ export async function saveProject(opts: { includeImages: boolean; saveAs?: boole
         presentation: s.presentation,
         compare: s.compare,
         viewMode: s.viewMode,
+        opening: s.opening,
         vessel: s.vessel,
         step: s.step,
         treatments: s.treatments,
@@ -230,8 +232,15 @@ export async function openProject(file: File) {
       }
     }
     const { path: _damagePath, ...damage } = json.damage;
+    // Studies saved before the open/close slider open closed.
+    const op = json.state.opening;
+    const opening = {
+      amount: typeof op?.amount === 'number' && Number.isFinite(op.amount) ? Math.max(0, Math.min(1, op.amount)) : 0,
+      side: op?.side === 1 ? (1 as const) : (-1 as const),
+    };
     set({
       ...json.state,
+      opening,
       images,
       damage,
       dirty: false,

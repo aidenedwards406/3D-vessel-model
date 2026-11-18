@@ -112,8 +112,21 @@ The left-hand panel walks through the study in numbered steps that follow the ro
 **Share** (bottom of the panel and top bar):
 
 - **Save** (Phase 7): one `.vessel` file with the model, sections, placements, damage data, treatment key, colours and presentation scenes, optionally with all images. Opening it restores the study exactly. Without images it stays small, and the images can be relinked from their folder.
-- **Present** (Phase 8): full screen, no editing controls, with the study title, company logo, colour legend and a confidentiality footer. Save views as **scenes** and step through them with the arrow keys; Space rotates the model. Scenes adapt to the screen they are shown on.
+- **Present** (Phase 8): full screen, no editing controls, with the study title, company logo, colour legend and a confidentiality footer. Save views as **scenes** and step through them with the arrow keys; Space rotates the model and O opens or closes the vessel. Scenes adapt to the screen they are shown on, and remember whether the vessel was open.
 - **Export** (Phase 9): high-resolution PNGs of the 3D view (up to 4K, white/transparent/dark, with title and legend), every vessel or every treatment average as a ZIP of PNGs, vector **region maps** (SVG), charts (SVG/PNG), a statistics workbook (`.xlsx`), data for JMP (`.csv`), the coloured 3D model (`.glb`, opens in PowerPoint), and a **PDF summary report** with heat maps from the top and bottom, region maps, statistics, charts, every vessel and the data table.
+
+### Opening the vessel
+
+The vertical slider on the right edge of the 3D view opens the vessel lengthways like a book, so you can see the top and bottom halves separately. It works in every step and when presenting.
+
+- **Drag up** to lift the top half away from the bottom half. It turns on a hinge that runs along one side of the vessel and follows its curves. **Drag down** to close it again.
+- At **90°** the top half stands up with its inside facing you. At **180°** both halves lie side by side with their inner (luminal) surfaces facing up. Seen from the top, the top half is above the bottom half, like the rows of the region map.
+- Click **Open** or **Closed** at the ends of the slider, or press **O** anywhere, to open or close the vessel fully. With the slider selected, ↑ and ↓ move it 10° at a time (45° with Shift), and Home and End close or open it.
+- The hinge goes on the side facing away from you when the vessel starts to open, so the top half always swings away and turns its inside towards you.
+- Everything else keeps working while the vessel is open. Hover for values, click a marker or region to see its images, and open them full screen. Compare treatments with all views opened together, and export PNGs of what you see. Image markers move to the inner wall, the side you are looking at.
+- Presentation scenes remember whether the vessel was open, and saved studies reopen the way they were saved. The PDF report always uses the standard closed views from the top and bottom.
+
+![The demo vessel opened like a book and seen from the top: the top half lies above the bottom half with both inner surfaces facing up, the open/close slider on the right is at Open, and clicking a location on the top half opens its image](docs/open.jpg)
 
 ### Statistics
 
@@ -222,7 +235,8 @@ src/
   App.tsx                 page layout, drag-and-drop routing, shortcuts
   components/             UI: steps panel, 3D viewer overlays, image panel and viewer,
                           region map, charts, statistics, dialogs, presentation mode
-  geometry/               centerline and section finding (runs in a Web Worker), STL parsing
+  geometry/               centerline and section finding (runs in a Web Worker), STL parsing,
+                          opening the vessel like a book
   three/                  Three.js engine, heat-map shader, model loaders
   lib/                    naming convention, spreadsheets, statistics, colour scales,
                           study data model, save/open, exports, PDF report, demo study

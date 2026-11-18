@@ -19,7 +19,8 @@ import { stripExtension, vesselKey, type Side } from '../lib/naming';
 import { readSpreadsheet, SpreadsheetError } from '../lib/spreadsheet';
 import { makeImageItem, uid, type ImageItem, type Placement, type Treatment, type TreatmentRole } from '../lib/study';
 import { loadModelFiles, ModelLoadError } from '../three/loaders';
-import type { CameraState, CameraView } from '../three/engine';
+import type { CameraState, CameraView, OpenMotion } from '../three/engine';
+import type { HingeSide } from '../geometry/opening';
 import { assets, clearImageAssets } from './assets';
 import { getDerived, getVessels } from './derived';
 import { emptyModel, get, initialState, set, toast, update, type Scene, type StepId, type UpAxis } from './store';
@@ -534,6 +535,27 @@ export function stepVessel(dir: -1 | 1) {
   });
 }
 
+// ── Opening the vessel ──────────────────────────────────────────────────────
+
+/**
+ * Opens the vessel lengthways like a book (0 = closed, 1 = fully open). When it starts
+ * to open, the hinge goes on the side facing away from the camera, so the top half lifts
+ * away and its inside turns towards the viewer.
+ */
+export function setOpening(amount: number, opts: { motion?: OpenMotion; side?: HingeSide } = {}) {
+  const s = get();
+  const a = Math.max(0, Math.min(1, Number.isFinite(amount) ? amount : 0));
+  let side = opts.side ?? s.opening.side;
+  if (!opts.side && s.opening.amount <= 0 && a > 0) side = assets.engine?.preferredHingeSide() ?? side;
+  if (a !== s.opening.amount || side !== s.opening.side) set({ opening: { amount: a, side } });
+  assets.engine?.setOpening(a, side, opts.motion ?? 'instant');
+}
+
+/** Closes an open vessel, or opens a closed one fully. */
+export function toggleOpening() {
+  setOpening(get().opening.amount > 0 ? 0 : 1, { motion: 'animate' });
+}
+
 // ── Presentation scenes ─────────────────────────────────────────────────────
 
 export function addScene(camera: CameraState, title?: string, view?: CameraView) {
@@ -556,6 +578,7 @@ export function addScene(camera: CameraState, title?: string, view?: CameraView)
     compare: s.compare,
     camera,
     view: view ?? assets.engine?.getCameraView(),
+    opening: { ...s.opening },
   };
   update((st) => ({ presentation: { ...st.presentation, scenes: [...st.presentation.scenes, scene] } }));
   toast(`Added "${scene.title}" to the presentation.`, 'success');
@@ -569,6 +592,8 @@ export function applyScene(scene: Scene) {
     compare: scene.compare,
     selection: null,
   });
+  // Open or close the vessel as it was when the scene was saved (older scenes leave it as it is).
+  if (scene.opening) setOpening(scene.opening.amount, { side: scene.opening.side === 1 ? 1 : -1, motion: 'animate' });
   // Wait for the layout to update, then frame the saved view for this screen.
   window.setTimeout(() => {
     const eng = assets.engine;

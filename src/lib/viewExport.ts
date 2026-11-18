@@ -175,19 +175,24 @@ export async function exportAllPng(kind: 'vessels' | 'groups', opts: ImageOption
   return new Blob(chunks as Uint8Array<ArrayBuffer>[], { type: 'application/zip' });
 }
 
-/** Renders a target from a camera preset (used by the PDF report). */
+/**
+ * Renders a target from a camera preset (used by the PDF report). The report's top and bottom
+ * views always show the vessel closed, whatever the open/close slider is set to.
+ */
 export async function renderTargetImage(target: ViewTarget, preset: CameraPreset, width: number, height: number): Promise<HTMLCanvasElement> {
   const engine = assets.engine!;
   const s = useStore.getState();
-  const cam = engine.getCameraState();
-  engine.setCameraPreset(preset, false, width / height);
-  const set = singleTargetViews(s, target, false);
-  engine.setViews(set.views, 1);
-  const c = engine.renderImage({ width, height, background: '#ffffff', hideMarkers: true });
-  const restore = computeViews(s, document.documentElement.getAttribute('data-theme') === 'dark');
-  engine.setViews(restore.views, restore.columns);
-  engine.setCameraState(cam, false);
-  return c;
+  return engine.withClosedVessel(() => {
+    const cam = engine.getCameraState();
+    engine.setCameraPreset(preset, false, width / height);
+    const set = singleTargetViews(s, target, false);
+    engine.setViews(set.views, 1);
+    const c = engine.renderImage({ width, height, background: '#ffffff', hideMarkers: true });
+    const restore = computeViews(s, document.documentElement.getAttribute('data-theme') === 'dark');
+    engine.setViews(restore.views, restore.columns);
+    engine.setCameraState(cam, false);
+    return c;
+  });
 }
 
 export async function exportGlb(): Promise<Blob> {

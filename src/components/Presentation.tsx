@@ -132,7 +132,7 @@ export function PresentationChrome() {
           </button>
         </div>
         <div className={cx('hidden text-right text-[11.5px] text-muted transition-opacity md:block', idle && 'opacity-0')}>
-          ← → {p.scenes.length ? 'scenes' : 'vessels'} · Space rotate · click a location for images · Esc exit
+          ← → {p.scenes.length ? 'scenes' : 'vessels'} · Space rotate · O open/close · click a location for images · Esc exit
         </div>
       </div>
     </div>

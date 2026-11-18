@@ -9,6 +9,12 @@
  *
  * Section boundaries, P/M/D boundaries and the top/bottom divide are drawn as
  * anti-aliased lines, so they stay crisp regardless of mesh resolution.
+ *
+ * Opening the vessel (see geometry/opening.ts): when open, the mesh is drawn
+ * twice. The top pass turns every vertex about the hinge and keeps only the
+ * pixels on the top side of the divide; the bottom pass draws the mesh in place
+ * and keeps only the bottom side. Together they cut the surface exactly along
+ * the divide, even through triangles that cross it, without changing the mesh.
  */
 import * as THREE from 'three';
 import { MAX_SECTIONS, MAX_SLOTS } from '../lib/regions';
@@ -38,6 +44,33 @@ export interface RegionUniforms {
   uPlain: THREE.IUniform<THREE.Color>;
   uLine: THREE.IUniform<THREE.Color>;
   uHatch: THREE.IUniform<number>;
+  /** Hinge per centerline sample: row 0 = hinge point, row 1 = hinge axis (model space). */
+  uSpine: THREE.IUniform<THREE.DataTexture>;
+  uSpineN: THREE.IUniform<number>;
+  /** Signed angle the top half is turned by (radians); 0 = closed. */
+  uOpenAngle: THREE.IUniform<number>;
+}
+
+/** Which part of the vessel a material draws: the whole closed vessel, or one half of the open vessel. */
+export const HALF_ALL = -1;
+export const HALF_TOP = 0;
+export const HALF_BOTTOM = 1;
+
+/** Float texture holding the hinge (see opening.ts) for the vertex shader. */
+export function makeSpineTexture(hinge: Float32Array, axis: Float32Array, count: number): THREE.DataTexture {
+  const data = new Float32Array(Math.max(2, count) * 2 * 4);
+  const w = Math.max(2, count);
+  for (let k = 0; k < count; k++) {
+    for (let d = 0; d < 3; d++) {
+      data[4 * k + d] = hinge[3 * k + d];
+      data[4 * (w + k) + d] = axis[3 * k + d];
+    }
+  }
+  const tex = new THREE.DataTexture(data, w, 2, THREE.RGBAFormat, THREE.FloatType);
+  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  return tex;
 }
 
 export function makeDataTexture(): THREE.DataTexture {
@@ -80,15 +113,62 @@ export function createRegionUniforms(): RegionUniforms {
     uPlain: { value: new THREE.Color('#d8cfc6') },
     uLine: { value: new THREE.Color('#1a1a19') },
     uHatch: { value: 1 },
+    uSpine: { value: makeSpineTexture(new Float32Array(6), new Float32Array([1, 0, 0, 1, 0, 0]), 2) },
+    uSpineN: { value: 2 },
+    uOpenAngle: { value: 0 },
   };
 }
 
 const VERT_DECL = /* glsl */ `
 attribute float aT;
 attribute vec2 aAng;
+uniform sampler2D uSpine;
+uniform float uSpineN;
+uniform float uOpenAngle;
+uniform float uHalf;
 varying float vT;
 varying vec2 vAng;
 varying vec3 vObj;
+`;
+
+// Top half of an open vessel: turn about the hinge at this point along the vessel
+// (Rodrigues' rotation; the same maths as openPoint in geometry/opening.ts).
+const VERT_OPEN_NORMAL = /* glsl */ `
+vec3 vsHinge = vec3(0.0);
+vec3 vsAxis = vec3(1.0, 0.0, 0.0);
+float vsCos = 1.0;
+float vsSin = 0.0;
+bool vsOpen = uHalf > -0.5 && uHalf < 0.5 && uOpenAngle != 0.0;
+if (vsOpen) {
+  float sx = clamp(aT, 0.0, 1.0) * (uSpineN - 1.0);
+  int i0 = int(min(floor(sx), uSpineN - 1.0));
+  int i1 = min(i0 + 1, int(uSpineN) - 1);
+  float sf = sx - float(i0);
+  vsHinge = mix(texelFetch(uSpine, ivec2(i0, 0), 0).xyz, texelFetch(uSpine, ivec2(i1, 0), 0).xyz, sf);
+  vsAxis = normalize(mix(texelFetch(uSpine, ivec2(i0, 1), 0).xyz, texelFetch(uSpine, ivec2(i1, 1), 0).xyz, sf));
+  vsCos = cos(uOpenAngle);
+  vsSin = sin(uOpenAngle);
+  objectNormal = objectNormal * vsCos + cross(vsAxis, objectNormal) * vsSin + vsAxis * dot(vsAxis, objectNormal) * (1.0 - vsCos);
+}
+`;
+
+const VERT_OPEN_POSITION = /* glsl */ `
+vT = aT;
+vAng = aAng;
+vObj = position;
+if (vsOpen) {
+  vec3 vsP = transformed - vsHinge;
+  transformed = vsHinge + vsP * vsCos + cross(vsAxis, vsP) * vsSin + vsAxis * dot(vsAxis, vsP) * (1.0 - vsCos);
+}
+`;
+
+// Each pass keeps only its own side of the top/bottom divide (same test as regionColor).
+const FRAG_OPEN_CLIP = /* glsl */ `
+if (uHalf > -0.5) {
+  float hsSin = uFlip > 0.5 ? -vAng.y : vAng.y;
+  float hsTop = vAng.x * uTop.x + hsSin * uTop.y;
+  if ((hsTop >= 0.0) != (uHalf < 0.5)) discard;
+}
 `;
 
 const FRAG_DECL = /* glsl */ `
@@ -112,6 +192,7 @@ uniform vec3 uUnsectioned;
 uniform vec3 uPlain;
 uniform vec3 uLine;
 uniform float uHatch;
+uniform float uHalf;
 varying float vT;
 varying vec2 vAng;
 varying vec3 vObj;
@@ -212,7 +293,12 @@ vec3 regionColor() {
 }
 `;
 
-export function createRegionMaterial(uniforms: RegionUniforms): THREE.MeshStandardMaterial {
+/**
+ * The vessel material. Uniforms are shared between materials; `half` is this
+ * material's own (HALF_ALL, HALF_TOP or HALF_BOTTOM), so the two halves of an
+ * open vessel can be drawn with the same shader program.
+ */
+export function createRegionMaterial(uniforms: RegionUniforms, half: THREE.IUniform<number> = { value: HALF_ALL }): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     roughness: 0.62,
@@ -220,15 +306,17 @@ export function createRegionMaterial(uniforms: RegionUniforms): THREE.MeshStanda
     side: THREE.DoubleSide,
   });
   mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, uniforms, { uHalf: half });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERT_DECL}`)
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vT = aT;\n  vAng = aAng;\n  vObj = position;');
+      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>\n${VERT_OPEN_NORMAL}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERT_OPEN_POSITION}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAG_DECL}`)
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>\n${FRAG_OPEN_CLIP}`)
       .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = regionColor();');
   };
-  mat.customProgramCacheKey = () => 'vessel-region-v1';
+  mat.customProgramCacheKey = () => 'vessel-region-v2';
   return mat;
 }
 

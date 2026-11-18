@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { HingeSide } from '../geometry/opening';
 import type { PaletteId } from '../lib/colormaps';
 import type { DamageMapping, DamageRow, SkippedRow } from '../lib/importers';
 import type { Side } from '../lib/naming';
@@ -86,6 +87,14 @@ export interface DamageState {
   sheetNames: string[];
 }
 
+/** How far the vessel is opened lengthways, like a book (see geometry/opening.ts). */
+export interface Opening {
+  /** 0 = closed, 1 = fully open (top half turned 180°, beside the bottom half). */
+  amount: number;
+  /** Side of the vessel the hinge is on. */
+  side: HingeSide;
+}
+
 export interface Scene {
   id: string;
   title: string;
@@ -96,6 +105,8 @@ export interface Scene {
   camera: CameraState;
   /** Screen-independent camera (preferred when present). */
   view?: CameraView;
+  /** Open or closed vessel (scenes saved before this existed leave it as it is). */
+  opening?: Opening;
 }
 
 export interface PresentationSettings {
@@ -125,6 +136,7 @@ export interface AppState {
   vesselTreatment: Record<string, string>;
   heat: HeatSettings;
   viewMode: ViewMode;
+  opening: Opening;
   vessel: string | null;
   selection: Selection | null;
   compare: CompareState;
@@ -219,6 +231,7 @@ export function initialState(): Omit<AppState, 'theme'> {
     vesselTreatment: {},
     heat: { ...defaultHeat },
     viewMode: 'sections',
+    opening: { amount: 0, side: -1 },
     vessel: null,
     selection: null,
     compare: { layout: 'pair', left: null, right: null, diff: false },
